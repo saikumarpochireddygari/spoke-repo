@@ -209,10 +209,6 @@ with DAG(
     start_date=datetime(2025, 1, 1),
     catchup=False,
     tags=["iris", TEAM, ENV],
-    access_control={
-        "team_a_ds": {"can_read", "can_edit"},
-        "platform_ops": {"can_read", "can_edit"},
-    },
 ) as dag:
 
     ingest_task = PythonOperator(
