@@ -81,7 +81,7 @@ def validate_iris_data(**context):
 
     df = pd.read_csv(path)
 
-    required_cols = ["sepal_length", "sepal_width", "petal_length", "petal_width", "species"]
+    required_cols = ["sepal_length", "sepal_width", "pedal_length", "pedal_width", "class"]
     missing = [c for c in required_cols if c not in df.columns]
     if missing:
         raise ValueError(f"Missing required columns: {missing}")
@@ -107,8 +107,8 @@ def train_iris_model(**context):
     dataset_hash = ti.xcom_pull(key="dataset_hash", task_ids="validate")
 
     df = pd.read_csv(dataset_path)
-    X = df[["sepal_length", "sepal_width", "petal_length", "petal_width"]]
-    y = df["species"]
+    X = df[["sepal_length", "sepal_width", "pedal_length", "pedal_width"]]
+    y = df["class"]
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
