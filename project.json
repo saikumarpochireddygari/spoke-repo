@@ -1,0 +1,8 @@
+{
+  "project_name": "iris_classifier",
+  "team": "team_a",
+  "allowed_envs": ["dev", "stage"],
+  "dag_path": "airflow/dags",
+  "owner": "iris_team",
+  "tags": ["iris", "classification", "ml"]
+}
