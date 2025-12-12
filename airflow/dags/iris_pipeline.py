@@ -155,11 +155,15 @@ def train_iris_model(**context):
             },
         )
 
-
 def register_iris_model(**context):
     """
-    Separate 'registration' step, using the MLflow run_id from training.
+    Register model and enforce:
+      - Only ONE version stays in 'Staging'
+      - Alias 'staging' always points to latest approved version
+      - Model version tags for traceability
     """
+    from mlflow.tracking import MlflowClient
+
     ti = context["ti"]
     run_id = ti.xcom_pull(key="mlflow_run_id", task_ids="train")
     accuracy = float(ti.xcom_pull(key="accuracy", task_ids="train"))
@@ -168,19 +172,68 @@ def register_iris_model(**context):
     model_name = f"{TEAM}_{ENV}_iris_model"
     model_version = None
 
+    client = MlflowClient()
+
     if approval_state == "approved":
+        # 1) Register from this run
         registered_model = mlflow.register_model(
             model_uri=f"runs:/{run_id}/model",
             name=model_name,
         )
         model_version = registered_model.version
 
-        from mlflow.tracking import MlflowClient
-        client = MlflowClient()
+        # 2) Promote new version to Staging
         client.transition_model_version_stage(
             name=model_name,
             version=model_version,
             stage="Staging",
+        )
+
+        # 3) Demote ANY other versions currently in Staging
+        versions = client.search_model_versions(f"name = '{model_name}'")
+        for v in versions:
+            if v.current_stage == "Staging" and v.version != model_version:
+                # choose "Archived" or "None" depending on your policy
+                client.transition_model_version_stage(
+                    name=model_name,
+                    version=v.version,
+                    stage="Archived",
+                )
+
+        # 4) Maintain 'staging' alias on latest version (optional but nice)
+        try:
+            client.set_registered_model_alias(
+                name=model_name,
+                alias="staging",
+                version=model_version,
+            )
+        except Exception as e:
+            print(f"[WARN] Failed to set alias 'staging' for {model_name}: {e}")
+
+        # 5) Add model version tags (show up under the version in UI)
+        client.set_model_version_tag(
+            name=model_name,
+            version=model_version,
+            key="approval_state",
+            value=approval_state,
+        )
+        client.set_model_version_tag(
+            name=model_name,
+            version=model_version,
+            key="env",
+            value=ENV,
+        )
+        client.set_model_version_tag(
+            name=model_name,
+            version=model_version,
+            key="team",
+            value=TEAM,
+        )
+        client.set_model_version_tag(
+            name=model_name,
+            version=model_version,
+            key="run_id",
+            value=run_id,
         )
 
     audit_log(
@@ -193,6 +246,43 @@ def register_iris_model(**context):
             "approval_state": approval_state,
         },
     )
+# def register_iris_model(**context):
+#     """
+#     Separate 'registration' step, using the MLflow run_id from training.
+#     """
+#     ti = context["ti"]
+#     run_id = ti.xcom_pull(key="mlflow_run_id", task_ids="train")
+#     accuracy = float(ti.xcom_pull(key="accuracy", task_ids="train"))
+#     approval_state = ti.xcom_pull(key="approval_state", task_ids="train")
+
+#     model_name = f"{TEAM}_{ENV}_iris_model"
+#     model_version = None
+
+#     if approval_state == "approved":
+#         registered_model = mlflow.register_model(
+#             model_uri=f"runs:/{run_id}/model",
+#             name=model_name,
+#         )
+#         model_version = registered_model.version
+
+#         from mlflow.tracking import MlflowClient
+#         client = MlflowClient()
+#         client.transition_model_version_stage(
+#             name=model_name,
+#             version=model_version,
+#             stage="Staging",
+#         )
+
+#     audit_log(
+#         "model_registration",
+#         {
+#             "mlflow_run_id": run_id,
+#             "model_name": model_name,
+#             "model_version": model_version,
+#             "accuracy": accuracy,
+#             "approval_state": approval_state,
+#         },
+#     )
 
 
 default_args = {
