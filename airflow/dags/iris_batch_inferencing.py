@@ -245,7 +245,7 @@ default_args = {
 with DAG(
     dag_id="team_a_dev_iris_batch_inference",
     default_args=default_args,
-    schedule_interval=None,  # run on-demand (e.g., triggered by Jenkins)
+    schedule_interval="@daily",  # run on-demand (e.g., triggered by Jenkins)
     start_date=datetime(2025, 1, 1),
     catchup=False,
     tags=["iris", TEAM, ENV, "batch_inference"],
